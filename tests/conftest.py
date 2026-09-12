@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from session import SESSION_STORE_ENV
 from store import RECEIPTS_LOG_ENV
 
 
@@ -14,3 +15,10 @@ def isolate_receipt_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
     log_path = tmp_path / "receipts" / "log.jsonl"
     monkeypatch.setenv(RECEIPTS_LOG_ENV, str(log_path))
     return log_path
+
+
+@pytest.fixture(autouse=True)
+def isolate_session_store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    session_root = tmp_path / "sessions"
+    monkeypatch.setenv(SESSION_STORE_ENV, str(session_root))
+    return session_root
