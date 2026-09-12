@@ -14,7 +14,7 @@ from typing import Any
 
 from adapter import BaseLMAdapter, MockAdapter
 from canonical import sha256_hex
-from claims import Claim, extract_claims, polarity_of
+from claims import Claim, extract_claims, normalize_claim, polarity_of
 from jcr import Contradiction
 from pipeline import PipelineResult, run_draft
 from replay import stored_replay_fields
@@ -51,6 +51,14 @@ def _result_with_receipt(result: PipelineResult, receipt: dict[str, Any]) -> Pip
         user_visible=result.user_visible,
         receipt=receipt,
         payload_kind=result.payload_kind,
+    )
+
+
+def _claim_identity(text: str) -> str:
+    return " ".join(
+        token
+        for token in normalize_claim(text).split()
+        if token not in {"not", "cannot", "never", "no"}
     )
 
 
@@ -157,9 +165,12 @@ class CSLMSession:
             for prior in self._released_precedents.values():
                 if not set(item.sources).intersection(prior["sources"]):
                     continue
-                if item.status == "unsupported" and "contradict" in item.reason.lower():
+                if item.contradicted:
                     reason = f"{item.reason}; contradicts released claim {prior['claim_id']}"
-                elif claim.polarity != prior["polarity"]:
+                elif (
+                    claim.polarity != prior["polarity"]
+                    and _claim_identity(claim.text) == prior["identity"]
+                ):
                     reason = f"claim polarity contradicts released claim {prior['claim_id']}"
                 else:
                     continue
@@ -190,6 +201,7 @@ class CSLMSession:
                 precedents[scoped_id] = {
                     "claim_id": scoped_id,
                     "sources": tuple(str(source) for source in claim.get("sources") or ()),
+                    "identity": _claim_identity(str(claim.get("text") or "")),
                     "polarity": polarity_of(str(claim.get("text") or "")),
                 }
         return precedents
@@ -248,6 +260,7 @@ class CSLMSession:
             self._released_precedents[scoped_id] = {
                 "claim_id": scoped_id,
                 "sources": tuple(str(source) for source in claim.get("sources") or ()),
+                "identity": _claim_identity(str(claim.get("text") or "")),
                 "polarity": polarity_of(str(claim.get("text") or "")),
             }
 

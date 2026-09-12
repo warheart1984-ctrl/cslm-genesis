@@ -87,6 +87,8 @@ def test_session_turn_endpoint_serializes_concurrent_updates() -> None:
         server.server_close()
 
     assert {first["decision"], second["decision"]} == {"release"}
+    assert first["answer"] == "Water's chemical formula is H2O."
+    assert second["answer"] == "Mars has two moons."
     assert {first["receipt"]["session"]["turn_id"], second["receipt"]["session"]["turn_id"]} == {
         "t1",
         "t2",

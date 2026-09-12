@@ -26,6 +26,7 @@ class SupportResult:
     uncertainty: str | None
     reason: str
     method: str = "none"
+    contradicted: bool = False
 
 
 def cited_sources(draft_text: str) -> tuple[str, ...]:
@@ -63,6 +64,7 @@ def check_claim(claim: Claim, draft_text: str) -> SupportResult:
                     uncertainty=None,
                     reason=computed.reason,
                     method="compute",
+                    contradicted=True,
                 )
             case "unknown":
                 pass
@@ -88,6 +90,7 @@ def check_claim(claim: Claim, draft_text: str) -> SupportResult:
                 uncertainty=None,
                 reason=looked.reason,
                 method="lookup",
+                contradicted=True,
             )
         case "unknown":
             pass
