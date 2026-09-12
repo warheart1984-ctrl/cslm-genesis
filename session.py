@@ -426,8 +426,8 @@ class SessionManager:
 
     def save_session(self, session: CSLMSession) -> Path:
         session_id = self._validate_session_id(session.session_id)
+        session_data = session.to_dict()
         with self._session_lock(session_id):
-            session_data = session.to_dict()
             path = self._write_session_json(session_id, session_data)
             decisions = tuple(
                 receipt.get("governance_compliance", {}).get("decision", "")
@@ -446,7 +446,7 @@ class SessionManager:
                     "path": str(path),
                 }
                 self._write_index_json(index)
-            write_session_export(session_data)
+        write_session_export(session_data)
         return path
 
     def export_session(self, session_id: str) -> dict[str, Any]:

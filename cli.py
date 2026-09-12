@@ -61,7 +61,11 @@ def _export_receipt(argv: list[str]) -> int:
     parser.add_argument("receipt_id", help="Receipt id to export")
     args = parser.parse_args(argv)
     load_dotenv()
-    event = build_receipt_export(load_receipt(args.receipt_id))
+    try:
+        event = build_receipt_export(load_receipt(args.receipt_id))
+    except (FileNotFoundError, KeyError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     json.dump(event, sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")
     return 0
