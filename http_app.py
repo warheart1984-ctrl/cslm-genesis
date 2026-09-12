@@ -61,10 +61,11 @@ class Handler(BaseHTTPRequestHandler):
         draft = data.get("draft")
         history_context = bool(data.get("history_context"))
         try:
-            adapter = select_adapter(str(draft) if draft is not None else None)
             manager = SessionManager()
+            normalized_session_id = manager.normalize_session_id(session_id)
+            adapter = select_adapter(str(draft) if draft is not None else None)
             result = manager.turn(
-                session_id,
+                normalized_session_id,
                 adapter=adapter,
                 prompt=prompt,
                 draft=str(draft) if draft is not None else None,
@@ -74,7 +75,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"error": str(exc)})
             return
         payload = result.public_payload()
-        payload["session_id"] = session_id
+        payload["session_id"] = normalized_session_id
         self._json(200, payload)
 
 

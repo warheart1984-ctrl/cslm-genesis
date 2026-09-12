@@ -35,14 +35,18 @@ def decide(
     contradictions: list[Contradiction] | None = None,
 ) -> JcrDecision:
     detected_contradictions = contradictions or []
+    contradicted_claim_ids = {item.claim_id for item in detected_contradictions}
     unsupported = [item for item in support_results if item.status == "unsupported"]
     supported = [item for item in support_results if item.status == "supported"]
+    releasable_supported = [
+        item for item in supported if item.claim_id not in contradicted_claim_ids
+    ]
     contradiction_reasons = tuple(
         dict.fromkeys(item.reason for item in detected_contradictions if item.reason)
     )
 
     if detected_contradictions:
-        if supported:
+        if releasable_supported:
             return JcrDecision(
                 decision="revise",
                 reasons=contradiction_reasons

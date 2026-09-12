@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from adapter import BaseLMAdapter, MockAdapter
+from canonical import sha256_hex
 from claims import extract_claims
 from jcr import Contradiction
 from pipeline import PipelineResult, run_draft
@@ -43,13 +44,6 @@ def _session_receipts(receipts: tuple[dict[str, Any], ...]) -> tuple[dict[str, A
     return tuple(deepcopy(receipt) for receipt in receipts)
 
 
-def _write_json(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + ".tmp")
-    temp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    temp.replace(path)
-
-
 def _result_with_receipt(result: PipelineResult, receipt: dict[str, Any]) -> PipelineResult:
     return PipelineResult(
         decision=result.decision,
@@ -73,12 +67,9 @@ def _support_from_claim(claim: dict[str, Any], claim_id: str) -> SupportResult:
 def _released_answers(receipts: tuple[dict[str, Any], ...]) -> list[str]:
     answers: list[str] = []
     for receipt in receipts:
-        if receipt.get("governance_compliance", {}).get("decision") != "release":
-            continue
-        replay = receipt.get("organism_binding", {}).get("replay") or {}
-        draft = str(replay.get("draft") or "").strip()
-        if draft:
-            answers.append(draft)
+        released = str((receipt.get("session") or {}).get("released_answer_text") or "").strip()
+        if released:
+            answers.append(released)
     return answers
 
 
@@ -188,6 +179,7 @@ class CSLMSession:
                 for claim in receipt.get("factual_support", {}).get("claims", [])
                 if str(claim.get("status")) == "supported" and result.decision == "release"
             ],
+            "released_answer_text": result.user_visible if result.released_answer else None,
             "contradictions": [
                 {
                     "claim_id": local_to_scoped.get(item.claim_id, item.claim_id),
@@ -326,6 +318,9 @@ class SessionManager:
             raise ValueError("session_id must match [A-Za-z0-9][A-Za-z0-9._-]{0,127}")
         return cleaned
 
+    def normalize_session_id(self, session_id: str) -> str:
+        return self._validate_session_id(session_id)
+
     def _session_lock(self, session_id: str) -> threading.RLock:
         with self._session_locks_guard:
             return self._session_locks.setdefault(session_id, threading.RLock())
@@ -334,8 +329,25 @@ class SessionManager:
     def index_path(self) -> Path:
         return self.root / SESSION_INDEX
 
+    def _session_filename(self, session_id: str) -> str:
+        return f"{sha256_hex(self._validate_session_id(session_id))}.json"
+
     def _session_path(self, session_id: str) -> Path:
-        return self.root / f"{self._validate_session_id(session_id)}.json"
+        return self.root / self._session_filename(session_id)
+
+    def _write_index_json(self, data: dict[str, Any]) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        temp = self.root / f"{SESSION_INDEX}.tmp"
+        temp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        temp.replace(self.index_path)
+
+    def _write_session_json(self, session_id: str, data: dict[str, Any]) -> Path:
+        path = self._session_path(session_id)
+        self.root.mkdir(parents=True, exist_ok=True)
+        temp = self.root / f"{self._session_filename(session_id)}.tmp"
+        temp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        temp.replace(path)
+        return path
 
     def _load_index(self) -> dict[str, Any]:
         with self._index_lock:
@@ -345,7 +357,7 @@ class SessionManager:
 
     def _save_index(self, index: dict[str, Any]) -> None:
         with self._index_lock:
-            _write_json(self.index_path, index)
+            self._write_index_json(index)
 
     def create_session(self, session_id: str, adapter: BaseLMAdapter) -> CSLMSession:
         return CSLMSession(self._validate_session_id(session_id), adapter, manager=self)
@@ -353,8 +365,7 @@ class SessionManager:
     def save_session(self, session: CSLMSession) -> Path:
         session_id = self._validate_session_id(session.session_id)
         with self._session_lock(session_id):
-            path = self._session_path(session_id)
-            _write_json(path, session.to_dict())
+            path = self._write_session_json(session_id, session.to_dict())
             decisions = tuple(
                 receipt.get("governance_compliance", {}).get("decision", "")
                 for receipt in session._receipts
@@ -371,7 +382,7 @@ class SessionManager:
                     "decisions": list(decisions),
                     "path": str(path),
                 }
-                _write_json(self.index_path, index)
+                self._write_index_json(index)
         return path
 
     def load_session(self, session_id: str, adapter: BaseLMAdapter) -> CSLMSession:
