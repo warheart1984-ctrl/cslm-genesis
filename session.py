@@ -83,6 +83,25 @@ class QueryResult:
     path: str
 
 
+def _receipt_signature(receipt: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "decision": receipt.get("governance_compliance", {}).get("decision"),
+        "reasons": receipt.get("governance_compliance", {}).get("reasons"),
+        "draft": receipt.get("organism_binding", {}).get("replay", {}).get("draft"),
+        "released_answer": receipt.get("organism_binding", {}).get("effect", {}).get("released_answer"),
+        "payload_kind": receipt.get("organism_binding", {}).get("effect", {}).get("payload_kind"),
+        "session": {
+            "turn_id": receipt.get("session", {}).get("turn_id"),
+            "prompt": receipt.get("session", {}).get("prompt"),
+            "history_context": receipt.get("session", {}).get("history_context"),
+            "submitted_draft": receipt.get("session", {}).get("submitted_draft"),
+            "released_claim_ids": receipt.get("session", {}).get("released_claim_ids"),
+            "released_answer_text": receipt.get("session", {}).get("released_answer_text"),
+            "contradictions": receipt.get("session", {}).get("contradictions"),
+        },
+    }
+
+
 class CSLMSession:
     def __init__(
         self,
@@ -99,6 +118,7 @@ class CSLMSession:
         self.adapter = adapter
         self._receipts = list(receipts or [])
         self.released_claims = dict(released_claims or {})
+        self._released_precedents = self._build_released_precedents(self._receipts)
         self._manager = manager
         now = _utc_now()
         self.created_at = created_at or now
@@ -133,24 +153,8 @@ class CSLMSession:
         support: list[SupportResult],
     ) -> list[Contradiction]:
         contradictions: list[Contradiction] = []
-        prior_claims: list[dict[str, Any]] = []
-        for receipt in self._receipts:
-            if receipt.get("governance_compliance", {}).get("decision") != "release":
-                continue
-            session_meta = receipt.get("session") or {}
-            claim_ids = session_meta.get("claim_ids") or {}
-            for claim in receipt.get("factual_support", {}).get("claims", []):
-                if str(claim.get("status")) != "supported":
-                    continue
-                prior_claims.append(
-                    {
-                        "claim_id": claim_ids.get(str(claim["id"]), str(claim["id"])),
-                        "sources": tuple(str(source) for source in claim.get("sources") or ()),
-                        "polarity": polarity_of(str(claim.get("text") or "")),
-                    }
-                )
         for claim, item in zip(claims, support):
-            for prior in prior_claims:
+            for prior in self._released_precedents.values():
                 if not set(item.sources).intersection(prior["sources"]):
                     continue
                 if item.status == "unsupported" and "contradict" in item.reason.lower():
@@ -169,6 +173,27 @@ class CSLMSession:
                 break
         return contradictions
 
+    def _build_released_precedents(
+        self,
+        receipts: list[dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        precedents: dict[str, dict[str, Any]] = {}
+        for receipt in receipts:
+            if receipt.get("governance_compliance", {}).get("decision") != "release":
+                continue
+            session_meta = receipt.get("session") or {}
+            claim_ids = session_meta.get("claim_ids") or {}
+            for claim in receipt.get("factual_support", {}).get("claims", []):
+                if str(claim.get("status")) != "supported":
+                    continue
+                scoped_id = claim_ids.get(str(claim["id"]), str(claim["id"]))
+                precedents[scoped_id] = {
+                    "claim_id": scoped_id,
+                    "sources": tuple(str(source) for source in claim.get("sources") or ()),
+                    "polarity": polarity_of(str(claim.get("text") or "")),
+                }
+        return precedents
+
     def _annotate_receipt(
         self,
         result: PipelineResult,
@@ -176,6 +201,7 @@ class CSLMSession:
         turn_id: str,
         prompt: str,
         history_context: bool,
+        submitted_draft: str,
         contradictions: list[Contradiction],
     ) -> PipelineResult:
         receipt = deepcopy(result.receipt)
@@ -188,6 +214,7 @@ class CSLMSession:
             "turn_id": turn_id,
             "prompt": prompt,
             "history_context": history_context,
+            "submitted_draft": submitted_draft,
             "claim_ids": local_to_scoped,
             "released_claim_ids": [
                 local_to_scoped[str(claim["id"])]
@@ -218,6 +245,11 @@ class CSLMSession:
             if not scoped_id:
                 continue
             self.released_claims[scoped_id] = _support_from_claim(claim, scoped_id)
+            self._released_precedents[scoped_id] = {
+                "claim_id": scoped_id,
+                "sources": tuple(str(source) for source in claim.get("sources") or ()),
+                "polarity": polarity_of(str(claim.get("text") or "")),
+            }
 
     def turn(
         self,
@@ -245,6 +277,7 @@ class CSLMSession:
             turn_id=turn_id,
             prompt=prompt,
             history_context=history_context,
+            submitted_draft=generated_draft.text,
             contradictions=contradictions,
         )
         if persist:
@@ -438,15 +471,16 @@ class SessionManager:
         for receipt in stored.get("receipts") or []:
             prompt, draft, expected = stored_replay_fields(receipt)
             history_context = bool((receipt.get("session") or {}).get("history_context"))
+            submitted_draft = str((receipt.get("session") or {}).get("submitted_draft") or draft)
             result = replayed.turn(
                 str((receipt.get("session") or {}).get("prompt") or prompt),
-                draft=draft,
+                draft=submitted_draft,
                 history_context=history_context,
                 persist=False,
             )
-            if result.decision != expected:
+            if result.decision != expected or _receipt_signature(result.receipt) != _receipt_signature(receipt):
                 raise ValueError(
-                    f"session replay diverged for {cleaned}: expected {expected}, got {result.decision}"
+                    f"session replay diverged for {cleaned}: stored and replayed turn do not match"
                 )
         return replayed
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
 from urllib.parse import unquote
 from typing import Any
 
@@ -24,6 +25,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
+        path = urlsplit(self.path).path
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b"{}"
         try:
@@ -31,7 +33,7 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self._json(400, {"error": "invalid json"})
             return
-        if self.path == "/v0/complete":
+        if path == "/v0/complete":
             prompt = str(data.get("prompt") or "").strip()
             if not prompt:
                 self._json(400, {"error": "prompt is required"})
@@ -47,10 +49,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         prefix = "/v0/session/"
         suffix = "/turn"
-        if not (self.path.startswith(prefix) and self.path.endswith(suffix)):
+        if not (path.startswith(prefix) and path.endswith(suffix)):
             self._json(404, {"error": "not found"})
             return
-        session_id = unquote(self.path[len(prefix) : -len(suffix)]).strip()
+        session_id = unquote(path[len(prefix) : -len(suffix)]).strip()
         prompt = str(data.get("prompt") or "").strip()
         if not session_id:
             self._json(400, {"error": "session_id is required"})
