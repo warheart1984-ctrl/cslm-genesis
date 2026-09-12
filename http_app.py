@@ -5,11 +5,14 @@ from __future__ import annotations
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
+from urllib.parse import unquote
 from typing import Any
 
 from adapter import MockAdapter, select_adapter
 from envload import load_dotenv
 from pipeline import run
+from session import SessionManager
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -22,9 +25,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
-        if self.path != "/v0/complete":
-            self._json(404, {"error": "not found"})
-            return
+        path = urlsplit(self.path).path
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b"{}"
         try:
@@ -32,18 +33,52 @@ class Handler(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             self._json(400, {"error": "invalid json"})
             return
+        if path == "/v0/complete":
+            prompt = str(data.get("prompt") or "").strip()
+            if not prompt:
+                self._json(400, {"error": "prompt is required"})
+                return
+            draft = data.get("draft")
+            try:
+                adapter = MockAdapter(str(draft)) if draft is not None else select_adapter()
+                result = run(prompt, adapter=adapter)
+            except RuntimeError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            self._json(200, result.public_payload())
+            return
+        prefix = "/v0/session/"
+        suffix = "/turn"
+        if not (path.startswith(prefix) and path.endswith(suffix)):
+            self._json(404, {"error": "not found"})
+            return
+        session_id = unquote(path[len(prefix) : -len(suffix)]).strip()
         prompt = str(data.get("prompt") or "").strip()
+        if not session_id:
+            self._json(400, {"error": "session_id is required"})
+            return
         if not prompt:
             self._json(400, {"error": "prompt is required"})
             return
         draft = data.get("draft")
+        history_context = bool(data.get("history_context"))
         try:
-            adapter = MockAdapter(str(draft)) if draft is not None else select_adapter()
-            result = run(prompt, adapter=adapter)
-        except RuntimeError as exc:
+            manager = SessionManager()
+            normalized_session_id = manager.normalize_session_id(session_id)
+            adapter = select_adapter(str(draft) if draft is not None else None)
+            result = manager.turn(
+                normalized_session_id,
+                adapter=adapter,
+                prompt=prompt,
+                draft=str(draft) if draft is not None else None,
+                history_context=history_context,
+            )
+        except (RuntimeError, ValueError) as exc:
             self._json(400, {"error": str(exc)})
             return
-        self._json(200, result.public_payload())
+        payload = result.public_payload()
+        payload["session_id"] = normalized_session_id
+        self._json(200, payload)
 
 
 def main() -> None:

@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from adapter import BaseLMAdapter, Draft
 from claims import Claim, clause_key, extract_claims, split_clauses, split_sentences
-from jcr import DecisionClass, decide
+from jcr import Contradiction, DecisionClass, decide
 from receipt import build_receipt
 from store import append_receipt
 from verifier import SupportResult, check_claims
@@ -90,13 +90,18 @@ def drop_unsupported_sentences(
     return " ".join(rebuilt).strip()
 
 
-def run(prompt: str, *, adapter: BaseLMAdapter) -> PipelineResult:
+def run_draft(
+    prompt: str,
+    *,
+    draft: Draft,
+    contradictions: list[Contradiction] | None = None,
+    store_receipt: bool = True,
+) -> PipelineResult:
     started = _utc_now()
     request_id = f"req:{uuid.uuid4()}"
-    draft = adapter.generate(prompt)
     claims = extract_claims(draft.text)
     support = check_claims(claims, draft.text)
-    decision = decide(support)
+    decision = decide(support, contradictions)
     if decision.decision == "revise":
         revised_text = drop_unsupported_sentences(draft.text, claims, support)
         if revised_text and revised_text != draft.text:
@@ -121,7 +126,8 @@ def run(prompt: str, *, adapter: BaseLMAdapter) -> PipelineResult:
         released_answer=released_answer,
         payload_kind=payload_kind,
     )
-    append_receipt(receipt)
+    if store_receipt:
+        append_receipt(receipt)
     return PipelineResult(
         decision=decision.decision,
         released_answer=released_answer,
@@ -129,3 +135,8 @@ def run(prompt: str, *, adapter: BaseLMAdapter) -> PipelineResult:
         receipt=receipt,
         payload_kind=payload_kind,
     )
+
+
+def run(prompt: str, *, adapter: BaseLMAdapter, store_receipt: bool = True) -> PipelineResult:
+    draft = adapter.generate(prompt)
+    return run_draft(prompt, draft=draft, store_receipt=store_receipt)

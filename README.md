@@ -66,6 +66,13 @@ Replay: same prompt + draft → same decision class (`organism_binding.replay.in
 python3 cli.py replay cslm:<hex>
 ```
 
+Optional ledger export:
+
+- `CSLM_LEDGER_EXPORT_LOG=/abs/path/to/ledger.jsonl` mirrors each emitted receipt as a ledger-friendly NDJSON event
+- `CSLM_LEDGER_SESSION_EXPORT_DIR=/abs/path/to/session-bundles` writes the latest full session bundle on each session save
+- `python3 cli.py export-receipt cslm:<hex>` prints a single receipt export event
+- `python3 cli.py export-session <session_id>` prints a full session export bundle
+
 ## Run
 
 ```bash
