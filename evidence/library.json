@@ -1,0 +1,177 @@
+{
+  "store_id": "cslm.evidence.v0",
+  "notes": "Independent evidence library. The model does not write this file. Established mechanisms may support release. Protocol hypotheses support only when stated as hypotheses or tests, not as settled nature.",
+  "facts": [
+    {
+      "id": "chemistry.water.formula",
+      "kind": "established",
+      "source": "lookup:chemistry.water.formula",
+      "subject_aliases": ["water", "dihydrogen monoxide"],
+      "predicate_aliases": ["chemical formula", "molecular formula", "formula"],
+      "value_aliases": ["h2o"],
+      "canonical": "H2O"
+    },
+    {
+      "id": "astronomy.mars.moons",
+      "kind": "established",
+      "source": "lookup:astronomy.mars.moons",
+      "subject_aliases": ["mars"],
+      "predicate_aliases": ["moons", "natural satellites", "satellites"],
+      "value_aliases": ["2", "two"],
+      "canonical": "2"
+    },
+    {
+      "id": "astronomy.earth.moons",
+      "kind": "established",
+      "source": "lookup:astronomy.earth.moons",
+      "subject_aliases": ["earth", "the earth"],
+      "predicate_aliases": ["moons", "natural satellites", "satellites"],
+      "value_aliases": ["1", "one"],
+      "canonical": "1"
+    },
+    {
+      "id": "geography.france.capital",
+      "kind": "established",
+      "source": "lookup:geography.france.capital",
+      "subject_aliases": ["france"],
+      "predicate_aliases": ["capital"],
+      "value_aliases": ["paris"],
+      "canonical": "Paris"
+    },
+    {
+      "id": "chemistry.water.freezing_c",
+      "kind": "established",
+      "source": "lookup:chemistry.water.freezing_c",
+      "subject_aliases": ["water"],
+      "predicate_aliases": ["freezes", "freezing point", "freezing"],
+      "value_aliases": ["0 c", "0 celsius", "0 degrees celsius", "zero celsius"],
+      "canonical": "0 °C"
+    },
+    {
+      "id": "physics.faraday.primary_response",
+      "kind": "established",
+      "source": "lookup:physics.faraday.primary_response",
+      "subject_aliases": ["faraday instability", "primary faraday instability", "faraday waves"],
+      "predicate_aliases": ["primary", "typically", "response"],
+      "value_aliases": ["subharmonic", "half the forcing frequency"],
+      "canonical": "typically subharmonic (half the forcing frequency)"
+    },
+    {
+      "id": "physics.faraday.harmonic_regime",
+      "kind": "established",
+      "source": "lookup:physics.faraday.harmonic_regime",
+      "subject_aliases": ["harmonic response", "harmonic instability"],
+      "predicate_aliases": ["favored", "shallow", "viscous"],
+      "value_aliases": ["high viscosity", "shallow"],
+      "canonical": "high viscosity or shallow layers can favor a harmonic response"
+    },
+    {
+      "id": "physics.faraday.floquet_not_pattern",
+      "kind": "established",
+      "source": "lookup:physics.faraday.floquet_not_pattern",
+      "subject_aliases": ["linear floquet analysis", "floquet analysis", "linear stability analysis"],
+      "predicate_aliases": ["predict", "selected spatial pattern", "pattern"],
+      "value_aliases": ["cannot", "does not", "incapable"],
+      "canonical": "does not predict the selected spatial pattern"
+    },
+    {
+      "id": "physics.faraday.z2_quadratic",
+      "kind": "established",
+      "source": "lookup:physics.faraday.z2_quadratic",
+      "subject_aliases": ["single-frequency subharmonic", "z2 sign symmetry"],
+      "predicate_aliases": ["quadratic"],
+      "value_aliases": ["suppresses", "forbidden", "suppressed"],
+      "canonical": "Z2 symmetry suppresses quadratic resonant terms"
+    },
+    {
+      "id": "physics.faraday.triad_resonance",
+      "kind": "established",
+      "source": "lookup:physics.faraday.triad_resonance",
+      "subject_aliases": ["spatial resonant triad", "triad resonance", "three-wave resonance"],
+      "predicate_aliases": ["condition", "satisfies", "formed"],
+      "value_aliases": ["k1 k2 k3", "three distinct wavevectors"],
+      "canonical": "k1 + k2 = k3"
+    },
+    {
+      "id": "physics.dispersion.gravity_capillary",
+      "kind": "established",
+      "source": "lookup:physics.dispersion.gravity_capillary",
+      "subject_aliases": ["gravity-capillary dispersion", "dispersion relation"],
+      "predicate_aliases": ["includes", "depends"],
+      "value_aliases": ["surface tension", "gravity", "finite depth"],
+      "canonical": "includes gravity, surface tension, and finite depth"
+    },
+    {
+      "id": "physics.kthny.hexatic_g6",
+      "kind": "established",
+      "source": "lookup:physics.kthny.hexatic_g6",
+      "subject_aliases": ["hexatic phase"],
+      "predicate_aliases": ["orientational correlation", "g6"],
+      "value_aliases": ["algebraic", "power-law"],
+      "canonical": "KTHNY hexatic: algebraic g6(r); this is a property of the theory, not a Faraday result"
+    },
+    {
+      "id": "protocol.dlt001.phase6_status",
+      "kind": "hypothesis_status",
+      "source": "lookup:protocol.dlt001.phase6_status",
+      "subject_aliases": ["phase 6 hypothesis", "phase 6"],
+      "predicate_aliases": ["established", "universal", "status"],
+      "value_aliases": ["preregistered", "candidate", "not established", "must be determined empirically"],
+      "canonical": "preregistered hypothesis; not an established universal Faraday result"
+    },
+    {
+      "id": "protocol.dlt001.kthny_empirical",
+      "kind": "hypothesis_status",
+      "source": "lookup:protocol.dlt001.kthny_empirical",
+      "subject_aliases": ["kthny", "faraday-wave melting", "faraday melting"],
+      "predicate_aliases": ["universality", "hexatic", "belongs"],
+      "value_aliases": ["empirically", "must be determined empirically", "candidate model"],
+      "canonical": "KTHNY is a candidate; Faraday hexatic membership must be determined empirically"
+    },
+    {
+      "id": "protocol.dlt001a.mdl_is_observer",
+      "kind": "protocol_definition",
+      "source": "lookup:protocol.dlt001a.mdl_is_observer",
+      "subject_aliases": ["mdl", "minimum description length", "dlt-001a"],
+      "predicate_aliases": ["physical medium", "fluid", "observer"],
+      "value_aliases": ["observer-side", "does not assume"],
+      "canonical": "MDL is observer-side; the fluid is not assumed to optimize MDL"
+    },
+    {
+      "id": "protocol.dlt001a.hexatic_requires_defects",
+      "kind": "protocol_definition",
+      "source": "lookup:protocol.dlt001a.hexatic_requires_defects",
+      "subject_aliases": ["hexatic label", "h_h win"],
+      "predicate_aliases": ["sufficient", "labeled hexatic"],
+      "value_aliases": ["defect topology", "translational correlation", "not sufficient"],
+      "canonical": "An H_H MDL win is not sufficient to label a state hexatic without matching defect topology and translational correlations"
+    },
+    {
+      "id": "protocol.dlt002.deception_is_test",
+      "kind": "protocol_definition",
+      "source": "lookup:protocol.dlt002.deception_is_test",
+      "subject_aliases": ["dlt-002", "dlt 002", "deception cost", "systematic deception"],
+      "predicate_aliases": ["universal thermodynamic penalty", "proves", "tests"],
+      "value_aliases": ["tests", "preregistered metric", "does not assume"],
+      "canonical": "DLT-002 is a test; it does not assume a universal deception penalty"
+    },
+    {
+      "id": "protocol.dlt003.closure_is_test",
+      "kind": "protocol_definition",
+      "source": "lookup:protocol.dlt003.closure_is_test",
+      "subject_aliases": ["dlt-003", "dlt 003", "phase 9 closure", "dynamical closure"],
+      "predicate_aliases": ["proves", "guarantees", "physical closure"],
+      "value_aliases": ["falsifiable", "causal-state", "equivalence region", "inconclusive"],
+      "canonical": "DLT-003 is a falsifiable causal-state test; inconclusive is a lawful outcome"
+    },
+    {
+      "id": "protocol.lineage_not_evidence",
+      "kind": "protocol_definition",
+      "source": "lookup:protocol.lineage_not_evidence",
+      "subject_aliases": ["diamond lens lineage", "internal research lineage", "synthsara"],
+      "predicate_aliases": ["empirical validation", "empirical evidence"],
+      "value_aliases": ["provenance", "not empirical validation", "hypothesis generation"],
+      "canonical": "lineage is provenance and hypothesis generation, not empirical validation"
+    }
+  ]
+}

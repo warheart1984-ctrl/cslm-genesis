@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cslm-genesis.local/receipt.schema.json",
+  "title": "CSLM-Genesis receipt v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "receipt_id",
+    "constitution_id",
+    "constitution_version_hash",
+    "factual_support",
+    "governance_compliance",
+    "execution_provenance",
+    "organism_binding"
+  ],
+  "properties": {
+    "receipt_version": {
+      "const": "cslm.receipt.v0"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^cslm:[0-9a-f]{64}$"
+    },
+    "constitution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "constitution_version_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "factual_support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claims"],
+      "description": "Bucket 1 — sources, computations, or explicit uncertainty. Not governance. Not provenance.",
+      "properties": {
+        "claims": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "text", "status", "sources", "uncertainty", "reason"],
+            "properties": {
+              "id": { "type": "string" },
+              "text": { "type": "string" },
+              "status": {
+                "type": "string",
+                "enum": ["supported", "uncertain", "unsupported"]
+              },
+              "sources": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "uncertainty": {
+                "type": ["string", "null"]
+              },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "governance_compliance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constitution_id",
+        "constitution_version_hash",
+        "applicable_rules",
+        "decision",
+        "reasons",
+        "jcr_authority"
+      ],
+      "description": "Bucket 2 — constitution, rules, JCR decision + reasons. Not factual support. Not provenance.",
+      "properties": {
+        "constitution_id": { "type": "string" },
+        "constitution_version_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "applicable_rules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["release", "revise", "block", "uncertainty_statement"]
+        },
+        "reasons": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "jcr_authority": { "type": "string" }
+      }
+    },
+    "execution_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "model_version",
+        "config",
+        "timestamps",
+        "request_id",
+        "generation_id"
+      ],
+      "description": "Bucket 3 — who ran, with what config, when. Not support. Not a JCR decision.",
+      "properties": {
+        "model_id": { "type": "string" },
+        "model_version": { "type": "string" },
+        "config": { "type": "object" },
+        "timestamps": {
+          "type": "object",
+          "required": ["started_utc", "finished_utc"],
+          "properties": {
+            "started_utc": { "type": "string" },
+            "finished_utc": { "type": "string" }
+          }
+        },
+        "request_id": { "type": "string" },
+        "generation_id": { "type": "string" }
+      }
+    },
+    "organism_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "organ",
+        "intent",
+        "decision",
+        "effect",
+        "evidence",
+        "replay",
+        "continuity"
+      ],
+      "description": "VOSS / organism_receipt.v1-shaped binding. Maps the language organ onto one law; it is not a fourth evidence kind.",
+      "properties": {
+        "organ": { "type": "object" },
+        "intent": { "type": "object" },
+        "decision": { "type": "object" },
+        "effect": { "type": "object" },
+        "evidence": { "type": "object" },
+        "replay": { "type": "object" },
+        "continuity": { "type": "object" }
+      }
+    }
+  }
+}
