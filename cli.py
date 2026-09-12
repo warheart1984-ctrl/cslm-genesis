@@ -7,11 +7,13 @@ import json
 import sys
 
 from adapter import MockAdapter, select_adapter
+from dlt_eval import main as eval_main
 from envload import load_dotenv
 from pipeline import run
+from replay import main as replay_main
 
 
-def main(argv: list[str] | None = None) -> int:
+def _run_prompt(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         description="CSLM-Genesis language organ: release only after a JCR decision."
     )
@@ -34,6 +36,15 @@ def main(argv: list[str] | None = None) -> int:
     json.dump(result.public_payload(), sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")
     return 0 if result.decision == "release" else 2
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == "replay":
+        return replay_main(args[1:])
+    if args and args[0] == "eval":
+        return eval_main(args[1:])
+    return _run_prompt(args)
 
 
 if __name__ == "__main__":

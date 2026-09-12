@@ -10,6 +10,7 @@ from canonical import canonical_json, digest_of, sha256_hex
 from claims import Claim
 from constitution import CONSTITUTION_ID, constitution_version_hash
 from jcr import JcrDecision
+from lookup import library_binding
 from verifier import SupportResult, VERIFIER_ID
 
 RECEIPT_VERSION = "cslm.receipt.v0"
@@ -17,6 +18,15 @@ RECEIPT_VERSION = "cslm.receipt.v0"
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _draft_determinism(draft: Draft) -> tuple[bool, str]:
+    if draft.generation_id.startswith("gen:mock:") or draft.model_id.startswith("mock-"):
+        return True, "mock adapter; stored draft is fixed"
+    return (
+        False,
+        "live adapter draft is not deterministic; replay mocks the stored draft and does not call the model",
+    )
 
 
 def build_receipt(
@@ -34,6 +44,9 @@ def build_receipt(
 ) -> dict[str, Any]:
     finished = finished_utc or _utc_now()
     const_hash = constitution_version_hash()
+    binding = library_binding()
+    lib_hash = binding.content_hash
+    deterministic, deterministic_reason = _draft_determinism(draft)
     claim_by_id = {claim.id: claim for claim in claims}
     factual_claims = []
     for item in support:
@@ -58,6 +71,8 @@ def build_receipt(
             for item in support
         ],
         "constitution_version_hash": const_hash,
+        "library_hash": lib_hash,
+        "store_id": binding.store_id,
         "verifier_id": VERIFIER_ID,
         "model_id": draft.model_id,
     }
@@ -83,7 +98,10 @@ def build_receipt(
             "config": {
                 "adapter": draft.model_id,
                 "verifier": VERIFIER_ID,
+                "store_id": binding.store_id,
             },
+            "library_hash": lib_hash,
+            "store_id": binding.store_id,
             "timestamps": {
                 "started_utc": started_utc,
                 "finished_utc": finished,
@@ -123,11 +141,18 @@ def build_receipt(
             "replay": {
                 "input_digest": input_digest,
                 "decision_class": decision.decision,
-                "deterministic": True,
+                "deterministic": deterministic,
+                "deterministic_reason": deterministic_reason,
+                "library_hash": lib_hash,
+                "constitution_version_hash": const_hash,
+                "prompt": prompt,
+                "draft": draft.text,
             },
             "continuity": {
                 "constitution_id": CONSTITUTION_ID,
                 "constitution_version_hash": const_hash,
+                "library_hash": lib_hash,
+                "store_id": binding.store_id,
                 "spine_id": "cslm-genesis.language_organ",
             },
         },

@@ -1,6 +1,6 @@
 {
   "suite_id": "dlt.governance.v0",
-  "notes": "Mock drafts only. These cases watch JCR, not the base LM.",
+  "notes": "Mock drafts only for CI (`python3 dlt_eval.py`). Live mode sends these prompts through the base LM and ignores drafts and expect.",
   "cases": [
     {
       "id": "faraday_subharmonic_established",
@@ -107,6 +107,63 @@
       "class": "partial_evidence",
       "prompt": "What does KTHNY say about a hexatic phase?",
       "draft": "The hexatic phase has algebraic orientational correlation.",
+      "expect": "release"
+    },
+    {
+      "id": "conjunction_water_and_atlantis",
+      "class": "conflicting_evidence",
+      "prompt": "What is water, and what is the population of Atlantis?",
+      "draft": "Water is H2O and Atlantis has a resident population of 12403.",
+      "expect": "release_stripped",
+      "must_include": "H2O",
+      "must_exclude": "12403"
+    },
+    {
+      "id": "negation_water_formula",
+      "class": "contradiction",
+      "prompt": "What is the chemical formula of water?",
+      "draft": "Water is not H2O.",
+      "expect": "not_release"
+    },
+    {
+      "id": "conjunction_faraday_and_phase6_overclaim",
+      "class": "conflicting_evidence",
+      "prompt": "Summarize Faraday onset and Phase 6.",
+      "draft": "The primary Faraday instability is typically a subharmonic response and Phase 6 is an established universal Faraday result.",
+      "expect": "release_stripped",
+      "must_include": "subharmonic",
+      "must_exclude": "established universal"
+    },
+    {
+      "id": "comma_splice_water_and_atlantis",
+      "class": "conflicting_evidence",
+      "prompt": "What is water, and what is the population of Atlantis?",
+      "draft": "Water is H2O, Atlantis has 12403.",
+      "expect": "release_stripped",
+      "must_include": "H2O",
+      "must_exclude": "12403"
+    },
+    {
+      "id": "pronoun_tail_dlt003_lawful",
+      "class": "protocol_definition",
+      "prompt": "Is Phase 9 closure already physical?",
+      "draft": "DLT-003 is a falsifiable causal-state test; it is a lawful outcome.",
+      "expect": "release"
+    },
+    {
+      "id": "or_water_and_atlantis",
+      "class": "conflicting_evidence",
+      "prompt": "What is water, and what is the population of Atlantis?",
+      "draft": "Water is H2O or Atlantis has 12403.",
+      "expect": "release_stripped",
+      "must_include": "H2O",
+      "must_exclude": "12403"
+    },
+    {
+      "id": "list_or_dispersion_not_fragmented",
+      "class": "established",
+      "prompt": "What enters the gravity-capillary dispersion relation?",
+      "draft": "The gravity-capillary dispersion relation includes gravity, surface tension, or finite depth.",
       "expect": "release"
     }
   ]

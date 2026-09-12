@@ -16,3 +16,6 @@ cslm = "cli:main"
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
+markers = [
+    "live: hits project Ollama on 11435; skipped when the server is down",
+]

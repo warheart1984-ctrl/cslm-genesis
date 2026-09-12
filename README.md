@@ -60,7 +60,11 @@ python3 cli.py "What is the chemical formula of water?" \
 
 First call must not `release` (expect `uncertainty_statement` + receipt). Second may `release` with a receipt.
 
-Replay: same prompt + draft → same decision class (`organism_binding.replay.input_digest`).
+Replay: same prompt + draft → same decision class (`organism_binding.replay.input_digest`). Receipts are appended to `receipts/log.jsonl` with the library hash. Re-check a stored id without calling Ollama:
+
+```bash
+python3 cli.py replay cslm:<hex>
+```
 
 ## Run
 
@@ -106,6 +110,22 @@ Preregistered cases in [`protocols/cases.json`](protocols/cases.json) watch gove
 python3 dlt_eval.py
 ```
 
+That mock suite is the CI law. It uses the checked-in `--draft` strings and expected decisions. Do not replace those expected outcomes with live model text.
+
+### Live Ollama governance eval
+
+```bash
+./scripts/start-local-lm.sh
+python3 dlt_eval.py --live
+# equivalent: python3 cli.py eval --live
+# protocol prompts only (skip smuggle / negation / invented-citation extras):
+python3 dlt_eval.py --live --no-extra
+```
+
+`--live` sends the protocol **prompts** (and an optional extra set in [`protocols/live_extra.json`](protocols/live_extra.json)) through llama3.2:3b. It does **not** feed mock drafts. Each row records prompt, model_id, decision, released_answer, receipt_id, and a short claim summary, then prints a decision histogram. Live drafts are marked **non-deterministic**. Receipts still append to the existing store.
+
+These runs are **governance observations** of JCR on whatever the 3B actually drafts. They are **not** Faraday or DLT science results, not a pass-rate, and not a reason to rewrite `expect` in `cases.json`. CI (`python3 -m pytest` / `python3 dlt_eval.py`) must not require Ollama.
+
 Lineage (not proof): [`provenance/LINEAGE.md`](provenance/LINEAGE.md). Constraints: [`constraints/dlt.md`](constraints/dlt.md).
 
 ## Limits (read these)
@@ -113,5 +133,6 @@ Lineage (not proof): [`provenance/LINEAGE.md`](provenance/LINEAGE.md). Constrain
 - The evidence library is a small checked-in file, not the web
 - A `[source: …]` tag the model invents is **not** support
 - Protocol hypotheses are not established physical facts
+- `dlt_eval.py --live` is a JCR observation of live drafts, not Faraday/DLT evidence
 - There is no token-level causality claim and no trained evidence head
 - Fine-tune later, and only after this gate catches real failures. Keep an **independent** verifier outside the model.

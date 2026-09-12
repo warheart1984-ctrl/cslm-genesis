@@ -14,3 +14,4 @@ build/
 htmlcov/
 .ollama-serve.log
 .ollama-serve.pid
+receipts/*.jsonl

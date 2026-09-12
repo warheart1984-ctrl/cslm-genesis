@@ -104,7 +104,8 @@
         "config",
         "timestamps",
         "request_id",
-        "generation_id"
+        "generation_id",
+        "library_hash"
       ],
       "description": "Bucket 3 — who ran, with what config, when. Not support. Not a JCR decision.",
       "properties": {
@@ -120,7 +121,12 @@
           }
         },
         "request_id": { "type": "string" },
-        "generation_id": { "type": "string" }
+        "generation_id": { "type": "string" },
+        "library_hash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "store_id": { "type": "string" }
       }
     },
     "organism_binding": {

@@ -60,6 +60,12 @@ def test_unknown_fact_stays_unsupported() -> None:
     assert outcome.kind == "unknown"
 
 
+def test_floquet_negative_fact_still_supported() -> None:
+    outcome = check_lookup("Linear Floquet analysis cannot predict the selected spatial pattern.")
+    assert outcome.kind == "supported"
+    assert outcome.fact_id == "physics.faraday.floquet_not_pattern"
+
+
 def test_revise_drops_unsupported_sentence_then_releases_rest() -> None:
     result = run(
         "What is the chemical formula of water?",

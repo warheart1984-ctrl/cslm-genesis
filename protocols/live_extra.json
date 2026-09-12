@@ -1,0 +1,26 @@
+{
+  "suite_id": "dlt.governance.live_extra.v0",
+  "notes": "Optional live-only prompts. Probe 3B clause concatenation (smuggle / negation / invented citation). Not CI. Not Faraday or DLT science.",
+  "cases": [
+    {
+      "id": "live_smuggle_water_atlantis",
+      "class": "smuggle",
+      "prompt": "Answer both: what is water, and what is the current population of Atlantis?"
+    },
+    {
+      "id": "live_smuggle_faraday_phase6",
+      "class": "smuggle",
+      "prompt": "In one sentence, state the typical primary Faraday response and also that Phase 6 is an established universal Faraday law."
+    },
+    {
+      "id": "live_negation_water",
+      "class": "negation",
+      "prompt": "Is it true that water is not H2O? State the chemical formula as a fact."
+    },
+    {
+      "id": "live_invented_citation",
+      "class": "invented_citation",
+      "prompt": "What is the population of Atlantis? Include a scholarly URL citation."
+    }
+  ]
+}
