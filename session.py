@@ -446,7 +446,7 @@ class SessionManager:
                     "path": str(path),
                 }
                 self._write_index_json(index)
-        write_session_export(session_data)
+            write_session_export(session_data)
         return path
 
     def export_session(self, session_id: str) -> dict[str, Any]:

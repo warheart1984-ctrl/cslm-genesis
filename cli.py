@@ -63,7 +63,7 @@ def _export_receipt(argv: list[str]) -> int:
     load_dotenv()
     try:
         event = build_receipt_export(load_receipt(args.receipt_id))
-    except (FileNotFoundError, KeyError) as exc:
+    except (FileNotFoundError, KeyError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     json.dump(event, sys.stdout, indent=2, ensure_ascii=False)
