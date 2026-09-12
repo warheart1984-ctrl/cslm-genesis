@@ -128,6 +128,17 @@ These runs are **governance observations** of JCR on whatever the 3B actually dr
 
 Lineage (not proof): [`provenance/LINEAGE.md`](provenance/LINEAGE.md). Constraints: [`constraints/dlt.md`](constraints/dlt.md).
 
+## Jarvis Memoryboard (AMUL / EMR / STM / LTM)
+
+Optional continuity board adapted from Jarvis Memoryboard architecture. See [`memory/README.md`](memory/README.md).
+
+- **STM** — session working memory (wired lightly into `CSLMSession` when a `JarvisBoard` is passed)
+- **LTM** — append-only durable store (`memory/data/`, gitignored)
+- **EMR** — governed activation into a working view (**Excited ≠ Authorized**)
+- **AMUL** — append-only LTM artifact substrate / lineage
+
+Board contents are **continuity / provenance**, not evidence. Unsupported claims still cannot release via memory alone.
+
 ## Limits (read these)
 
 - The evidence library is a small checked-in file, not the web
@@ -136,3 +147,4 @@ Lineage (not proof): [`provenance/LINEAGE.md`](provenance/LINEAGE.md). Constrain
 - `dlt_eval.py --live` is a JCR observation of live drafts, not Faraday/DLT evidence
 - There is no token-level causality claim and no trained evidence head
 - Fine-tune later, and only after this gate catches real failures. Keep an **independent** verifier outside the model.
+- The Jarvis board is not a trained CSLM and does not substitute for lookup/compute/JCR

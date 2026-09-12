@@ -15,3 +15,6 @@ htmlcov/
 .ollama-serve.log
 .ollama-serve.pid
 receipts/*.jsonl
+memory/data/*.jsonl
+memory/data/*.json
+!memory/data/.gitkeep

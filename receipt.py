@@ -41,6 +41,8 @@ def build_receipt(
     finished_utc: str | None = None,
     released_answer: bool,
     payload_kind: str,
+    session_id: str | None = None,
+    turn: int | None = None,
 ) -> dict[str, Any]:
     finished = finished_utc or _utc_now()
     const_hash = constitution_version_hash()
@@ -154,6 +156,11 @@ def build_receipt(
                 "library_hash": lib_hash,
                 "store_id": binding.store_id,
                 "spine_id": "cslm-genesis.language_organ",
+                **(
+                    {"session_id": session_id, "turn": turn}
+                    if session_id is not None and turn is not None
+                    else {}
+                ),
             },
         },
     }

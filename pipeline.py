@@ -90,7 +90,13 @@ def drop_unsupported_sentences(
     return " ".join(rebuilt).strip()
 
 
-def run(prompt: str, *, adapter: BaseLMAdapter) -> PipelineResult:
+def run(
+    prompt: str,
+    *,
+    adapter: BaseLMAdapter,
+    session_id: str | None = None,
+    turn: int | None = None,
+) -> PipelineResult:
     started = _utc_now()
     request_id = f"req:{uuid.uuid4()}"
     draft = adapter.generate(prompt)
@@ -120,6 +126,8 @@ def run(prompt: str, *, adapter: BaseLMAdapter) -> PipelineResult:
         started_utc=started,
         released_answer=released_answer,
         payload_kind=payload_kind,
+        session_id=session_id,
+        turn=turn,
     )
     append_receipt(receipt)
     return PipelineResult(
