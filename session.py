@@ -16,6 +16,7 @@ from adapter import BaseLMAdapter, MockAdapter
 from canonical import sha256_hex
 from claims import Claim, extract_claims, normalize_claim, polarity_of
 from jcr import Contradiction
+from ledger import build_session_export, write_session_export
 from pipeline import PipelineResult, run_draft
 from replay import stored_replay_fields
 from store import append_receipt
@@ -426,7 +427,8 @@ class SessionManager:
     def save_session(self, session: CSLMSession) -> Path:
         session_id = self._validate_session_id(session.session_id)
         with self._session_lock(session_id):
-            path = self._write_session_json(session_id, session.to_dict())
+            session_data = session.to_dict()
+            path = self._write_session_json(session_id, session_data)
             decisions = tuple(
                 receipt.get("governance_compliance", {}).get("decision", "")
                 for receipt in session._receipts
@@ -444,7 +446,12 @@ class SessionManager:
                     "path": str(path),
                 }
                 self._write_index_json(index)
+            write_session_export(session_data)
         return path
+
+    def export_session(self, session_id: str) -> dict[str, Any]:
+        session = self.load_session(self._validate_session_id(session_id), MockAdapter(""))
+        return build_session_export(session.to_dict())
 
     def load_session(self, session_id: str, adapter: BaseLMAdapter) -> CSLMSession:
         cleaned = self._validate_session_id(session_id)

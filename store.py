@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from ledger import append_receipt_export
+
 ROOT = Path(__file__).resolve().parent
 DEFAULT_RECEIPTS_LOG = ROOT / "receipts" / "log.jsonl"
 RECEIPTS_LOG_ENV = "CSLM_RECEIPTS_LOG"
@@ -26,6 +28,7 @@ def append_receipt(receipt: dict[str, Any], path: Path | None = None) -> Path:
     with target.open("a", encoding="utf-8") as handle:
         handle.write(line + "\n")
         handle.flush()
+    append_receipt_export(receipt)
     return target
 
 
