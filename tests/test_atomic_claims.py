@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from adapter import MockAdapter
-from claims import extract_claims, split_clauses
+from claims import extract_claims, normalize_claim, polarity_of, split_clauses
 from lookup import check_lookup
 from pipeline import run
 
@@ -39,6 +39,45 @@ def test_negation_of_water_formula_does_not_release() -> None:
     assert "negation" in claim["reason"]
 
 
+def test_contraction_negations_do_not_release_as_supported() -> None:
+    for draft in (
+        "Water isn't H2O.",
+        "Water's chemical formula isn't H2O.",
+        "Water doesn’t have formula H2O.",
+        "Water doesn't have formula H2O.",
+    ):
+        assert "not" in normalize_claim(draft), draft
+        assert polarity_of(draft) == "negated", draft
+        assert extract_claims(draft)[0].polarity == "negated", draft
+        result = run(
+            "What is the chemical formula of water?",
+            adapter=MockAdapter(draft),
+        )
+        assert result.decision != "release", draft
+        assert result.released_answer is False, draft
+
+
+def test_floquet_cant_contraction_still_releases() -> None:
+    for draft in (
+        "Linear Floquet analysis can't predict the selected spatial pattern.",
+        "Linear Floquet analysis cannot predict the selected spatial pattern.",
+    ):
+        assert normalize_claim(draft).startswith(
+            "linear floquet analysis cannot predict"
+        ), draft
+        outcome = check_lookup(draft)
+        assert outcome.kind == "supported", draft
+        assert outcome.fact_id == "physics.faraday.floquet_not_pattern", draft
+        result = run(
+            "Does linear Floquet analysis select the Faraday pattern?",
+            adapter=MockAdapter(draft),
+        )
+        assert result.decision == "release", draft
+        assert result.released_answer is True, draft
+        assert result.user_visible is not None
+        assert "Floquet" in result.user_visible
+
+
 def test_one_sentence_faraday_and_phase6_strips_overclaim() -> None:
     result = run(
         "Summarize Faraday onset and Phase 6.",
@@ -51,6 +90,74 @@ def test_one_sentence_faraday_and_phase6_strips_overclaim() -> None:
     assert result.user_visible is not None
     assert "subharmonic" in result.user_visible
     assert "established universal" not in result.user_visible
+
+
+def _not_release_or_stripped(result, *, must_exclude: tuple[str, ...], must_include: tuple[str, ...] = ()) -> None:
+    if result.decision == "release":
+        assert result.released_answer is True
+        assert result.user_visible is not None
+        visible = result.user_visible
+        for token in must_include:
+            assert token in visible
+        for token in must_exclude:
+            assert token not in visible
+        return
+    assert result.released_answer is False
+
+
+def test_elided_and_is_faraday_overclaim_does_not_ride_out() -> None:
+    draft = (
+        "The primary Faraday instability is typically a subharmonic response "
+        "and is an established universal Faraday result."
+    )
+    assert split_clauses(draft) == [
+        "The primary Faraday instability is typically a subharmonic response",
+        "The primary Faraday instability is an established universal Faraday result.",
+    ]
+    result = run(
+        "Summarize Faraday onset and Phase 6.",
+        adapter=MockAdapter(draft),
+    )
+    _not_release_or_stripped(
+        result,
+        must_include=("subharmonic",),
+        must_exclude=("established universal",),
+    )
+
+
+def test_elided_and_is_atlantis_capital_does_not_release() -> None:
+    draft = "Water is H2O and is the capital of Atlantis."
+    assert split_clauses(draft) == [
+        "Water is H2O",
+        "Water is the capital of Atlantis.",
+    ]
+    result = run(
+        "What is water, and what is the population of Atlantis?",
+        adapter=MockAdapter(draft),
+    )
+    _not_release_or_stripped(
+        result,
+        must_include=("H2O",),
+        must_exclude=("Atlantis", "capital"),
+    )
+    if result.decision == "release":
+        texts = [claim["text"] for claim in result.receipt["factual_support"]["claims"]]
+        assert texts == ["Water is H2O."]
+
+
+def test_relative_which_is_does_not_smuggle_wet() -> None:
+    draft = "Water, which is H2O, is wet."
+    parts = split_clauses(draft)
+    assert parts == ["Water, which is H2O", "Water, which is wet."]
+    assert not any("H2O" in part and "wet" in part for part in parts)
+    result = run(
+        "What is the chemical formula of water?",
+        adapter=MockAdapter(draft),
+    )
+    _not_release_or_stripped(result, must_exclude=("wet",))
+    if result.decision == "release":
+        texts = [claim["text"] for claim in result.receipt["factual_support"]["claims"]]
+        assert all("wet" not in claim for claim in texts)
 
 
 def test_lookup_requires_more_than_subject_and_value() -> None:

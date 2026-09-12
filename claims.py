@@ -60,7 +60,11 @@ def strip_citations(text: str) -> str:
 
 def normalize_claim(text: str) -> str:
     cleaned = strip_citations(text).lower()
+    # Possessive 's is not negation; strip it before expanding n't.
     cleaned = re.sub(r"['’]s\b", "", cleaned)
+    # Fold contractions so polarity sees "not" / value aliases see "cannot".
+    cleaned = re.sub(r"\bcan['’]t\b", "cannot", cleaned)
+    cleaned = re.sub(r"n['’]t\b", " not", cleaned)
     cleaned = re.sub(r"[^a-z0-9\s]", "", cleaned)
     cleaned = re.sub(r"\bnot an?\b", "not", cleaned)
     return re.sub(r"\s+", " ", cleaned).strip()
@@ -104,17 +108,17 @@ def split_sentences(text: str) -> list[str]:
 
 
 def looks_like_clause(text: str) -> bool:
-    """True when text has a subject-ish left edge plus an assertive verb or '='."""
+    """True when text has an assertive/copula or '=', even with no left-edge subject.
+
+    Elided tails (`and is…`, `, is…`) are clauses. Value lists still fail this
+    test on the right (`finite depth`), so both-sides splitting keeps them intact.
+    """
     bare = strip_citations(text).strip()
     if not bare:
         return False
     if "=" in bare:
-        return bool(re.search(r"[A-Za-z0-9]", bare.split("=", 1)[0]))
-    match = ASSERTIVE.search(bare)
-    if not match:
-        return False
-    before = bare[:match.start()].strip()
-    return bool(re.search(r"[A-Za-z0-9]", before))
+        return True
+    return bool(ASSERTIVE.search(bare))
 
 
 def subject_of(text: str) -> str:
