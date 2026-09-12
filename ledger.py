@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +16,8 @@ LEDGER_EXPORT_LOG_ENV = "CSLM_LEDGER_EXPORT_LOG"
 LEDGER_SESSION_EXPORT_ENV = "CSLM_LEDGER_SESSION_EXPORT_DIR"
 SOURCE_REPOSITORY = "warheart1984-ctrl/cslm-genesis"
 SOURCE_SYSTEM = "cslm-genesis"
+_PATH_LOCKS_GUARD = threading.Lock()
+_PATH_LOCKS: dict[str, threading.Lock] = {}
 
 
 def ledger_export_log_path() -> Path | None:
@@ -26,11 +30,18 @@ def ledger_session_export_root() -> Path | None:
     return Path(override) if override else None
 
 
+def _path_lock(path: Path) -> threading.Lock:
+    key = str(path.resolve())
+    with _PATH_LOCKS_GUARD:
+        return _PATH_LOCKS.setdefault(key, threading.Lock())
+
+
 def _write_json(path: Path, data: dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + ".tmp")
-    temp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    temp.replace(path)
+    with _path_lock(path):
+        temp = path.with_name(path.name + f".{uuid.uuid4().hex}.tmp")
+        temp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        temp.replace(path)
     return path
 
 
@@ -78,9 +89,10 @@ def append_receipt_export(receipt: dict[str, Any], path: Path | None = None) -> 
         return None
     target.parent.mkdir(parents=True, exist_ok=True)
     event = build_receipt_export(receipt)
-    with target.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False) + "\n")
-        handle.flush()
+    with _path_lock(target):
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+            handle.flush()
     return target
 
 

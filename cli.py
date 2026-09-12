@@ -46,7 +46,11 @@ def _export_session(argv: list[str]) -> int:
     parser.add_argument("session_id", help="Session id to export")
     args = parser.parse_args(argv)
     load_dotenv()
-    bundle = SessionManager().export_session(args.session_id)
+    try:
+        bundle = SessionManager().export_session(args.session_id)
+    except (FileNotFoundError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     json.dump(bundle, sys.stdout, indent=2, ensure_ascii=False)
     sys.stdout.write("\n")
     return 0

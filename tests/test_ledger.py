@@ -76,3 +76,8 @@ def test_cli_can_export_receipt_event(capsys) -> None:
     out = json.loads(capsys.readouterr().out)
     assert out["event_kind"] == "cslm.receipt"
     assert out["record"]["receipt_id"] == result.receipt["receipt_id"]
+
+
+def test_cli_export_session_fails_when_missing(capsys) -> None:
+    assert main(["export-session", "missing"]) == 1
+    assert "session not found: missing" in capsys.readouterr().err

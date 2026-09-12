@@ -450,7 +450,10 @@ class SessionManager:
         return path
 
     def export_session(self, session_id: str) -> dict[str, Any]:
-        session = self.load_session(self._validate_session_id(session_id), MockAdapter(""))
+        cleaned = self._validate_session_id(session_id)
+        if not self._session_path(cleaned).is_file():
+            raise FileNotFoundError(f"session not found: {cleaned}")
+        session = self.load_session(cleaned, MockAdapter(""))
         return build_session_export(session.to_dict())
 
     def load_session(self, session_id: str, adapter: BaseLMAdapter) -> CSLMSession:
