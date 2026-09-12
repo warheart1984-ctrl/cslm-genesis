@@ -14,7 +14,7 @@ from typing import Any
 
 from adapter import BaseLMAdapter, MockAdapter
 from canonical import sha256_hex
-from claims import extract_claims
+from claims import Claim, extract_claims, polarity_of
 from jcr import Contradiction
 from pipeline import PipelineResult, run_draft
 from replay import stored_replay_fields
@@ -129,29 +129,44 @@ class CSLMSession:
 
     def _detect_contradictions(
         self,
+        claims: list[Claim],
         support: list[SupportResult],
     ) -> list[Contradiction]:
         contradictions: list[Contradiction] = []
-        source_to_prior = {
-            tuple(item.sources): claim_id
-            for claim_id, item in self.released_claims.items()
-            if item.status == "supported" and item.sources
-        }
-        for item in support:
-            if item.status != "unsupported" or "contradict" not in item.reason.lower():
+        prior_claims: list[dict[str, Any]] = []
+        for receipt in self._receipts:
+            if receipt.get("governance_compliance", {}).get("decision") != "release":
                 continue
-            prior_claim_id = source_to_prior.get(tuple(item.sources))
-            if prior_claim_id is None:
-                continue
-            contradictions.append(
-                Contradiction(
-                    claim_id=item.claim_id,
-                    released_claim_id=prior_claim_id,
-                    reason=(
-                        f"{item.reason}; contradicts released claim {prior_claim_id}"
-                    ),
+            session_meta = receipt.get("session") or {}
+            claim_ids = session_meta.get("claim_ids") or {}
+            for claim in receipt.get("factual_support", {}).get("claims", []):
+                if str(claim.get("status")) != "supported":
+                    continue
+                prior_claims.append(
+                    {
+                        "claim_id": claim_ids.get(str(claim["id"]), str(claim["id"])),
+                        "sources": tuple(str(source) for source in claim.get("sources") or ()),
+                        "polarity": polarity_of(str(claim.get("text") or "")),
+                    }
                 )
-            )
+        for claim, item in zip(claims, support):
+            for prior in prior_claims:
+                if not set(item.sources).intersection(prior["sources"]):
+                    continue
+                if item.status == "unsupported" and "contradict" in item.reason.lower():
+                    reason = f"{item.reason}; contradicts released claim {prior['claim_id']}"
+                elif claim.polarity != prior["polarity"]:
+                    reason = f"claim polarity contradicts released claim {prior['claim_id']}"
+                else:
+                    continue
+                contradictions.append(
+                    Contradiction(
+                        claim_id=item.claim_id,
+                        released_claim_id=str(prior["claim_id"]),
+                        reason=reason,
+                    )
+                )
+                break
         return contradictions
 
     def _annotate_receipt(
@@ -218,7 +233,7 @@ class CSLMSession:
         generated_draft = live_adapter.generate(effective_prompt)
         claims = extract_claims(generated_draft.text)
         support = check_claims(claims, generated_draft.text)
-        contradictions = self._detect_contradictions(support)
+        contradictions = self._detect_contradictions(claims, support)
         result = run_draft(
             effective_prompt,
             draft=generated_draft,
@@ -468,7 +483,7 @@ class SessionManager:
                 continue
             if start_utc and updated_at < start_utc:
                 continue
-            if end_utc and created_at > end_utc:
+            if end_utc and updated_at > end_utc:
                 continue
             if decision and decision not in decisions:
                 continue

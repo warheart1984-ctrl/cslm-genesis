@@ -87,6 +87,10 @@ def test_session_turn_endpoint_serializes_concurrent_updates() -> None:
         server.server_close()
 
     assert {first["decision"], second["decision"]} == {"release"}
+    assert {first["receipt"]["session"]["turn_id"], second["receipt"]["session"]["turn_id"]} == {
+        "t1",
+        "t2",
+    }
     session = SessionManager().load_session("race", MockAdapter(""))
     assert len(session.receipts) == 2
     assert {receipt["session"]["turn_id"] for receipt in session.receipts} == {"t1", "t2"}
