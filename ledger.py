@@ -141,4 +141,16 @@ def write_session_export(session: dict[str, Any], root: Path | None = None) -> P
     if not session_id:
         raise ValueError("session export requires session_id")
     path = target_root / f"{sha256_hex(session_id)}.json"
-    return _write_json(path, build_session_export(session))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    bundle = build_session_export(session)
+    with _path_lock(path):
+        if path.is_file():
+            existing = json.loads(path.read_text(encoding="utf-8"))
+            existing_updated = str(existing.get("session", {}).get("updated_at") or "")
+            current_updated = str(bundle.get("session", {}).get("updated_at") or "")
+            if existing_updated and current_updated and existing_updated > current_updated:
+                return path
+        temp = path.with_name(path.name + f".{uuid.uuid4().hex}.tmp")
+        temp.write_text(json.dumps(bundle, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        temp.replace(path)
+    return path
