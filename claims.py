@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Literal
 
@@ -65,8 +66,22 @@ def normalize_claim(text: str) -> str:
     # Fold contractions so polarity sees "not" / value aliases see "cannot".
     cleaned = re.sub(r"\bcan['’]t\b", "cannot", cleaned)
     cleaned = re.sub(r"n['’]t\b", " not", cleaned)
+    cleaned = unicodedata.normalize("NFKD", cleaned)
+    cleaned = re.sub(r"\u0300-\u036f", "", cleaned)
     cleaned = re.sub(r"[^a-z0-9\s]", "", cleaned)
     cleaned = re.sub(r"\bnot an?\b", "not", cleaned)
+    # Domain-specific unicode normalization: superscript digits and fullwidth chars
+    _NORM_RULES = {
+        0x2070: "0", 0x2071: "1", 0x2072: "2", 0x2073: "3",
+        0x2074: "4", 0x2075: "5", 0x2076: "6", 0x2077: "7",
+        0x2078: "8", 0x2079: "9",
+        # fullwidth letters A-Z
+        **{0xFF00 + i: chr(ord("A") + i) for i in range(26)},
+        # fullwidth digits 0-9
+        **{0xFF10 + i: chr(ord("0") + i) for i in range(10)},
+    }
+    _translation_table = str.maketrans(_NORM_RULES)
+    cleaned = cleaned.translate(_translation_table)
     return re.sub(r"\s+", " ", cleaned).strip()
 
 

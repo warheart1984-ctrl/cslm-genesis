@@ -39,6 +39,7 @@ class SupportResult:
     uncertainty: str | None
     reason: str
     method: str = "none"
+    deception: str = "none"
 
 
 def cited_sources(draft_text: str) -> tuple[str, ...]:
@@ -143,6 +144,7 @@ def check_claim(claim: Claim, draft_text: str) -> SupportResult:
             uncertainty=None,
             reason="model-written citation is not independent evidence",
             method="none",
+            deception="model_citation",
         )
     return SupportResult(
         claim_id=claim.id,

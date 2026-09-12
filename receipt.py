@@ -29,6 +29,38 @@ def _draft_determinism(draft: Draft) -> tuple[bool, str]:
     )
 
 
+def replay_input_digest(
+    *,
+    prompt: str,
+    draft: str,
+    claim_texts: list[str],
+    support_rows: list[dict[str, Any]],
+    constitution_version_hash: str,
+    library_hash: str,
+    store_id: str,
+    verifier_id: str,
+    model_id: str,
+) -> str:
+    """Digest over the authoritative governance inputs, as recorded or replayed.
+
+    Replay recomputes this against the stored hashes so a receipt re-evaluates
+    under its own recorded law; drift means the recorded evaluation is no
+    longer reproducible from the stored inputs.
+    """
+    replay_input = {
+        "prompt": prompt,
+        "draft": draft,
+        "claims": list(claim_texts),
+        "support": list(support_rows),
+        "constitution_version_hash": constitution_version_hash,
+        "library_hash": library_hash,
+        "store_id": store_id,
+        "verifier_id": verifier_id,
+        "model_id": model_id,
+    }
+    return digest_of(replay_input)
+
+
 def build_receipt(
     *,
     prompt: str,
@@ -64,21 +96,21 @@ def build_receipt(
             }
         )
 
-    replay_input = {
-        "prompt": prompt,
-        "draft": draft.text,
-        "claims": [claim.text for claim in claims],
-        "support": [
-            {"id": item.claim_id, "status": item.status, "sources": list(item.sources)}
-            for item in support
-        ],
-        "constitution_version_hash": const_hash,
-        "library_hash": lib_hash,
-        "store_id": binding.store_id,
-        "verifier_id": VERIFIER_ID,
-        "model_id": draft.model_id,
-    }
-    input_digest = digest_of(replay_input)
+    support_rows = [
+        {"id": item.claim_id, "status": item.status, "sources": list(item.sources)}
+        for item in support
+    ]
+    input_digest = replay_input_digest(
+        prompt=prompt,
+        draft=draft.text,
+        claim_texts=[claim.text for claim in claims],
+        support_rows=support_rows,
+        constitution_version_hash=const_hash,
+        library_hash=lib_hash,
+        store_id=binding.store_id,
+        verifier_id=VERIFIER_ID,
+        model_id=draft.model_id,
+    )
 
     receipt: dict[str, Any] = {
         "receipt_version": RECEIPT_VERSION,

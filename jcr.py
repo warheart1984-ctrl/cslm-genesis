@@ -47,7 +47,8 @@ def decide(support_results: list[SupportResult]) -> JcrDecision:
             applicable_rules=APPLICABLE_RULES,
         )
 
-    if any("model-written citation" in item.reason for item in unsupported):
+    if any(item.deception == "model_citation" for item in unsupported) or \
+   any("model-written citation" in item.reason for item in unsupported):
         return JcrDecision(
             decision="block",
             reasons=(
