@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import threading
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -21,6 +23,7 @@ from verifier import SupportResult, check_claims
 SESSION_STORE_ENV = "CSLM_SESSION_STORE"
 DEFAULT_SESSION_ROOT = Path(__file__).resolve().parent / "receipts" / "sessions"
 SESSION_INDEX = "index.json"
+SESSION_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
 def _utc_now() -> str:
@@ -38,6 +41,13 @@ def _session_root(path: Path | None = None) -> Path:
 
 def _session_receipts(receipts: tuple[dict[str, Any], ...]) -> tuple[dict[str, Any], ...]:
     return tuple(deepcopy(receipt) for receipt in receipts)
+
+
+def _write_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    temp.replace(path)
 
 
 def _result_with_receipt(result: PipelineResult, receipt: dict[str, Any]) -> PipelineResult:
@@ -176,7 +186,7 @@ class CSLMSession:
             "released_claim_ids": [
                 local_to_scoped[str(claim["id"])]
                 for claim in receipt.get("factual_support", {}).get("claims", [])
-                if str(claim.get("status")) != "unsupported" and result.decision == "release"
+                if str(claim.get("status")) == "supported" and result.decision == "release"
             ],
             "contradictions": [
                 {
@@ -195,6 +205,8 @@ class CSLMSession:
         session_meta = receipt.get("session") or {}
         claim_ids = session_meta.get("claim_ids") or {}
         for claim in receipt.get("factual_support", {}).get("claims", []):
+            if str(claim.get("status")) != "supported":
+                continue
             scoped_id = claim_ids.get(str(claim["id"]))
             if not scoped_id:
                 continue
@@ -300,78 +312,103 @@ class CSLMSession:
 
 
 class SessionManager:
+    _index_lock = threading.RLock()
+    _session_locks_guard = threading.Lock()
+    _session_locks: dict[str, threading.RLock] = {}
+
     def __init__(self, root: Path | None = None) -> None:
         self.root = _session_root(root)
         self.root.mkdir(parents=True, exist_ok=True)
+
+    def _validate_session_id(self, session_id: str) -> str:
+        cleaned = session_id.strip()
+        if not SESSION_ID_RE.fullmatch(cleaned):
+            raise ValueError("session_id must match [A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+        return cleaned
+
+    def _session_lock(self, session_id: str) -> threading.RLock:
+        with self._session_locks_guard:
+            return self._session_locks.setdefault(session_id, threading.RLock())
 
     @property
     def index_path(self) -> Path:
         return self.root / SESSION_INDEX
 
     def _session_path(self, session_id: str) -> Path:
-        return self.root / f"{session_id}.json"
+        return self.root / f"{self._validate_session_id(session_id)}.json"
 
     def _load_index(self) -> dict[str, Any]:
-        if not self.index_path.is_file():
-            return {"sessions": {}}
-        return json.loads(self.index_path.read_text(encoding="utf-8"))
+        with self._index_lock:
+            if not self.index_path.is_file():
+                return {"sessions": {}}
+            return json.loads(self.index_path.read_text(encoding="utf-8"))
 
     def _save_index(self, index: dict[str, Any]) -> None:
-        self.index_path.write_text(json.dumps(index, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        with self._index_lock:
+            _write_json(self.index_path, index)
 
     def create_session(self, session_id: str, adapter: BaseLMAdapter) -> CSLMSession:
-        return CSLMSession(session_id, adapter, manager=self)
+        return CSLMSession(self._validate_session_id(session_id), adapter, manager=self)
 
     def save_session(self, session: CSLMSession) -> Path:
-        path = self._session_path(session.session_id)
-        path.write_text(json.dumps(session.to_dict(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        index = self._load_index()
-        decisions = tuple(
-            receipt.get("governance_compliance", {}).get("decision", "")
-            for receipt in session._receipts
-        )
-        index["sessions"][session.session_id] = {
-            "session_id": session.session_id,
-            "created_at": session.created_at,
-            "updated_at": session.updated_at,
-            "turns": len(session._receipts),
-            "decisions": list(decisions),
-            "path": str(path),
-        }
-        self._save_index(index)
+        session_id = self._validate_session_id(session.session_id)
+        with self._session_lock(session_id):
+            path = self._session_path(session_id)
+            _write_json(path, session.to_dict())
+            decisions = tuple(
+                receipt.get("governance_compliance", {}).get("decision", "")
+                for receipt in session._receipts
+            )
+            with self._index_lock:
+                index = {"sessions": {}}
+                if self.index_path.is_file():
+                    index = json.loads(self.index_path.read_text(encoding="utf-8"))
+                index["sessions"][session_id] = {
+                    "session_id": session_id,
+                    "created_at": session.created_at,
+                    "updated_at": session.updated_at,
+                    "turns": len(session._receipts),
+                    "decisions": list(decisions),
+                    "path": str(path),
+                }
+                _write_json(self.index_path, index)
         return path
 
     def load_session(self, session_id: str, adapter: BaseLMAdapter) -> CSLMSession:
-        path = self._session_path(session_id)
-        if not path.is_file():
-            return self.create_session(session_id, adapter)
-        data = json.loads(path.read_text(encoding="utf-8"))
-        released_claims = {
-            claim_id: SupportResult(
-                claim_id=str(item.get("claim_id") or claim_id),
-                status=str(item["status"]),  # type: ignore[arg-type]
-                sources=tuple(str(source) for source in item.get("sources") or ()),
-                uncertainty=item.get("uncertainty"),
-                reason=str(item.get("reason") or ""),
+        cleaned = self._validate_session_id(session_id)
+        with self._session_lock(cleaned):
+            path = self._session_path(cleaned)
+            if not path.is_file():
+                return self.create_session(cleaned, adapter)
+            data = json.loads(path.read_text(encoding="utf-8"))
+            released_claims = {
+                claim_id: SupportResult(
+                    claim_id=str(item.get("claim_id") or claim_id),
+                    status=str(item["status"]),  # type: ignore[arg-type]
+                    sources=tuple(str(source) for source in item.get("sources") or ()),
+                    uncertainty=item.get("uncertainty"),
+                    reason=str(item.get("reason") or ""),
+                )
+                for claim_id, item in (data.get("released_claims") or {}).items()
+            }
+            return CSLMSession(
+                session_id=cleaned,
+                adapter=adapter,
+                receipts=list(data.get("receipts") or []),
+                released_claims=released_claims,
+                manager=self,
+                created_at=str(data.get("created_at") or _utc_now()),
+                updated_at=str(data.get("updated_at") or _utc_now()),
             )
-            for claim_id, item in (data.get("released_claims") or {}).items()
-        }
-        return CSLMSession(
-            session_id=session_id,
-            adapter=adapter,
-            receipts=list(data.get("receipts") or []),
-            released_claims=released_claims,
-            manager=self,
-            created_at=str(data.get("created_at") or _utc_now()),
-            updated_at=str(data.get("updated_at") or _utc_now()),
-        )
 
     def replay_session(self, session_id: str) -> CSLMSession:
-        path = self._session_path(session_id)
-        if not path.is_file():
-            raise FileNotFoundError(f"session not found: {session_id}")
-        stored = json.loads(path.read_text(encoding="utf-8"))
-        replayed = CSLMSession(session_id, MockAdapter(""), created_at=str(stored.get("created_at") or _utc_now()))
+        cleaned = self._validate_session_id(session_id)
+        with self._session_lock(cleaned):
+            path = self._session_path(cleaned)
+            if not path.is_file():
+                raise FileNotFoundError(f"session not found: {cleaned}")
+            stored = json.loads(path.read_text(encoding="utf-8"))
+        replayed = CSLMSession(cleaned, MockAdapter(""), created_at=str(stored.get("created_at") or _utc_now()))
         for receipt in stored.get("receipts") or []:
             prompt, draft, expected = stored_replay_fields(receipt)
             history_context = bool((receipt.get("session") or {}).get("history_context"))
@@ -383,9 +420,23 @@ class SessionManager:
             )
             if result.decision != expected:
                 raise ValueError(
-                    f"session replay diverged for {session_id}: expected {expected}, got {result.decision}"
+                    f"session replay diverged for {cleaned}: expected {expected}, got {result.decision}"
                 )
         return replayed
+
+    def turn(
+        self,
+        session_id: str,
+        *,
+        adapter: BaseLMAdapter,
+        prompt: str,
+        draft: str | None = None,
+        history_context: bool = False,
+    ) -> PipelineResult:
+        cleaned = self._validate_session_id(session_id)
+        with self._session_lock(cleaned):
+            session = self.load_session(cleaned, adapter)
+            return session.turn(prompt, draft=draft, history_context=history_context, persist=True)
 
     def query_sessions(
         self,
@@ -402,7 +453,7 @@ class SessionManager:
             created_at = str(item.get("created_at") or "")
             updated_at = str(item.get("updated_at") or "")
             decisions = tuple(str(entry) for entry in item.get("decisions") or [])
-            if session_id and current_id != session_id:
+            if session_id and current_id != self._validate_session_id(session_id):
                 continue
             if start_utc and updated_at < start_utc:
                 continue

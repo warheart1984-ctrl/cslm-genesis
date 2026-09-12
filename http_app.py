@@ -63,13 +63,14 @@ class Handler(BaseHTTPRequestHandler):
         try:
             adapter = select_adapter(str(draft) if draft is not None else None)
             manager = SessionManager()
-            session = manager.load_session(session_id, adapter)
-            result = session.turn(
-                prompt,
+            result = manager.turn(
+                session_id,
+                adapter=adapter,
+                prompt=prompt,
                 draft=str(draft) if draft is not None else None,
                 history_context=history_context,
             )
-        except RuntimeError as exc:
+        except (RuntimeError, ValueError) as exc:
             self._json(400, {"error": str(exc)})
             return
         payload = result.public_payload()
