@@ -2,11 +2,14 @@
 epistemic hedges must not ride out as supported facts.
 
 The clause splitter (b9fd467) handles elided clauses and contractions. These
-vectors attack the other seam: content appended to a value within the same
-nominal group, or beside the subject, where no clause boundary exists.
+vectors attack the other seams: content appended to a value within the same
+nominal group, content beside the subject, content between the verb and the
+value, and epistemic hedges.
 """
 
 from __future__ import annotations
+
+import pytest
 
 from adapter import MockAdapter
 from claims import extract_claims
@@ -184,3 +187,72 @@ def test_dlt002_restatement_still_releases() -> None:
 def test_extract_claims_keeps_appositive_as_single_claim_for_gating() -> None:
     claims = extract_claims("Water is H2O, the secret ingredient of Atlantis.")
     assert [claim.text for claim in claims] == ["Water is H2O, the secret ingredient of Atlantis."]
+
+
+def test_verb_to_value_fabrication_does_not_ride_out() -> None:
+    result = run(
+        "What is water?",
+        adapter=MockAdapter("Water is poisonous and H2O."),
+    )
+    _never_release_with(result, ("poisonous",))
+    assert _claim_statuses(result) != {"supported"}
+
+
+def test_parenthetical_fabrication_does_not_ride_out() -> None:
+    result = run(
+        "What is water?",
+        adapter=MockAdapter("Water is, per Atlantis lore, H2O."),
+    )
+    _never_release_with(result, ("Atlantis", "lore"))
+
+
+def test_value_then_conjunct_tail_does_not_ride_out() -> None:
+    result = run(
+        "What is water?",
+        adapter=MockAdapter("Water is H2O and poisonous."),
+    )
+    _never_release_with(result, ("poisonous",))
+
+
+def test_intensifier_does_not_block_legit_fact() -> None:
+    for draft in (
+        "Water is literally H2O.",
+        "Water is exactly H2O.",
+        "Water is precisely H2O.",
+    ):
+        result = run(
+            "What is the chemical formula of water?",
+            adapter=MockAdapter(draft),
+        )
+        assert result.decision == "release", draft
+        assert result.user_visible is not None
+        assert "H2O" in result.user_visible
+
+
+def test_cross_sentence_pronoun_does_not_ride_out() -> None:
+    result = run(
+        "What is water, and what is the capital of Atlantis?",
+        adapter=MockAdapter("Water is H2O. It is the capital of Atlantis."),
+    )
+    _never_release_with(result, ("Atlantis", "capital"))
+    if result.decision == "release":
+        assert "H2O" in result.user_visible
+
+
+@pytest.mark.xfail(
+    reason=(
+        "Known pre-production limitation: elaboration between subject aliases is "
+        "semantically unfiltered; the store must authorize each elaboration "
+        "(e.g. add value alias) before the gate can block uncatalogued ones."
+    ),
+    strict=False,
+)
+def test_elaboration_zone_fabrication_is_a_documented_limitation() -> None:
+    result = run(
+        "What does DLT-002 claim?",
+        adapter=MockAdapter(
+            "DLT-002 tests whether systematic deception produces nuclear waste "
+            "under a preregistered metric."
+        ),
+    )
+    _never_release_with(result, ("nuclear", "waste"))

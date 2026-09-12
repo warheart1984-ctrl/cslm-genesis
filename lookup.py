@@ -32,6 +32,11 @@ RESIDUE_STOPS = frozenset(
     how what is are was were has have had be been being do does did not no
     even also both either neither whether it its this these those they them
     their there our you we he she if else while under over above
+    literally actually indeed precisely exactly simply merely purely truly just
+    per
+    allegedly reportedly supposedly apparently seemingly evidently presumably
+    probably possibly conceivably maybe perhaps rumored rumoured think believe
+    seems appears
     """.split()
 )
 
@@ -214,9 +219,36 @@ def _extra_after_last_alias(normalized: str, fact: Fact) -> list[str]:
     return _unclean_tokens(tail, fact)
 
 
+def _extra_between_boundary_and_value(normalized: str, fact: Fact) -> list[str]:
+    """Residue between the verb boundary and the first matched value alias.
+
+    Catches fabrication smuggled between the predicate and the value slot:
+    "Water is poisonous and H2O." or "Water is, per Atlantis lore, H2O."
+    """
+    spans = _alias_spans(normalized, fact)
+    value_starts = [start for start, _, phrase in spans if phrase in fact.value_aliases]
+    if not value_starts:
+        return []
+    first_value = min(value_starts)
+    subject_ends = [end for _, end, phrase in spans if phrase in fact.subject_aliases]
+    start_from = min(subject_ends) if subject_ends else 0
+    boundaries = [start for start, _, _ in spans if start >= start_from]
+    for match in ASSERTIVE.finditer(normalized):
+        if match.start() >= start_from:
+            boundaries.append(match.start())
+    if not boundaries:
+        return []
+    boundary = min(boundaries)
+    if boundary >= first_value:
+        return []
+    return _unclean_tokens(normalized[boundary:first_value], fact)
+
+
 def _claim_asserts_beyond_fact(normalized: str, fact: Fact) -> list[str]:
-    return _extra_between_subject_and_boundary(normalized, fact) + _extra_after_last_alias(
-        normalized, fact
+    return (
+        _extra_between_subject_and_boundary(normalized, fact)
+        + _extra_between_boundary_and_value(normalized, fact)
+        + _extra_after_last_alias(normalized, fact)
     )
 
 
