@@ -24,7 +24,8 @@ LookupKind = Literal["supported", "contradicted", "unknown", "unsupported"]
 
 # Function/structural words are always acceptable residue in a claim. One-word
 # content left over after alias removal, though, means the claim asserted
-# something the matched fact does not cover.
+# something the matched fact does not cover. Light connector verbs merely link
+# the subject to a value; the object noun must still be covered.
 RESIDUE_STOPS = frozenset(
     """
     a an and or nor but the of in on at to for from by with without before
@@ -37,6 +38,8 @@ RESIDUE_STOPS = frozenset(
     allegedly reportedly supposedly apparently seemingly evidently presumably
     probably possibly conceivably maybe perhaps rumored rumoured think believe
     seems appears
+    produces yields contains includes exhibits displays shows presents carries
+    holds possesses generates emits
     """.split()
 )
 
@@ -219,35 +222,41 @@ def _extra_after_last_alias(normalized: str, fact: Fact) -> list[str]:
     return _unclean_tokens(tail, fact)
 
 
-def _extra_between_boundary_and_value(normalized: str, fact: Fact) -> list[str]:
-    """Residue between the verb boundary and the first matched value alias.
+def _extra_between_subject_and_values(normalized: str, fact: Fact) -> list[str]:
+    """Fabrication in the elaboration zone: every gap after the subject
+    occurrence and before / between matched value occurrences.
 
-    Catches fabrication smuggled between the predicate and the value slot:
-    "Water is poisonous and H2O." or "Water is, per Atlantis lore, H2O."
+    Catches content smuggled between the subject spine and the value slot:
+    "DLT-002 tests whether systematic deception produces nuclear waste under a
+    preregistered metric." The elaboration "produces nuclear waste" is outside
+    the fact's authorized lexicon; only store-blessed elaborations (value
+    aliases) may occupy the zone.
     """
     spans = _alias_spans(normalized, fact)
-    value_starts = [start for start, _, phrase in spans if phrase in fact.value_aliases]
-    if not value_starts:
-        return []
-    first_value = min(value_starts)
     subject_ends = [end for _, end, phrase in spans if phrase in fact.subject_aliases]
-    start_from = min(subject_ends) if subject_ends else 0
-    boundaries = [start for start, _, _ in spans if start >= start_from]
-    for match in ASSERTIVE.finditer(normalized):
-        if match.start() >= start_from:
-            boundaries.append(match.start())
-    if not boundaries:
+    if not subject_ends:
         return []
-    boundary = min(boundaries)
-    if boundary >= first_value:
+    start_from = min(subject_ends)
+    value_spans = sorted(
+        (start, end)
+        for start, end, phrase in spans
+        if phrase in fact.value_aliases and start >= start_from
+    )
+    if not value_spans:
         return []
-    return _unclean_tokens(normalized[boundary:first_value], fact)
+    residue: list[str] = []
+    cursor = start_from
+    for start, end in value_spans:
+        if start > cursor:
+            residue.extend(_unclean_tokens(normalized[cursor:start], fact))
+        cursor = max(cursor, end)
+    return residue
 
 
 def _claim_asserts_beyond_fact(normalized: str, fact: Fact) -> list[str]:
     return (
         _extra_between_subject_and_boundary(normalized, fact)
-        + _extra_between_boundary_and_value(normalized, fact)
+        + _extra_between_subject_and_values(normalized, fact)
         + _extra_after_last_alias(normalized, fact)
     )
 

@@ -239,20 +239,36 @@ def test_cross_sentence_pronoun_does_not_ride_out() -> None:
         assert "H2O" in result.user_visible
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Known pre-production limitation: elaboration between subject aliases is "
-        "semantically unfiltered; the store must authorize each elaboration "
-        "(e.g. add value alias) before the gate can block uncatalogued ones."
-    ),
-    strict=False,
-)
-def test_elaboration_zone_fabrication_is_a_documented_limitation() -> None:
+def test_elaboration_zone_fabrication_does_not_ride_out() -> None:
     result = run(
         "What does DLT-002 claim?",
         adapter=MockAdapter(
             "DLT-002 tests whether systematic deception produces nuclear waste "
             "under a preregistered metric."
+        ),
+    )
+    _never_release_with(result, ("nuclear", "waste"))
+
+
+def test_store_blessed_elaboration_still_releases() -> None:
+    result = run(
+        "What does DLT-002 claim?",
+        adapter=MockAdapter(
+            "DLT-002 tests whether systematic deception produces excess cost "
+            "under a preregistered metric."
+        ),
+    )
+    assert result.decision == "release", result.decision
+    assert result.user_visible is not None
+    assert "excess cost" in result.user_visible
+
+
+def test_store_blessed_elaboration_with_extra_noun_blocked() -> None:
+    result = run(
+        "What does DLT-002 claim?",
+        adapter=MockAdapter(
+            "DLT-002 tests whether systematic deception produces excess cost "
+            "and nuclear waste under a preregistered metric."
         ),
     )
     _never_release_with(result, ("nuclear", "waste"))
