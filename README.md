@@ -148,3 +148,4 @@ Board contents are **continuity / provenance**, not evidence. Unsupported claims
 - There is no token-level causality claim and no trained evidence head
 - Fine-tune later, and only after this gate catches real failures. Keep an **independent** verifier outside the model.
 - The Jarvis board is not a trained CSLM and does not substitute for lookup/compute/JCR
+- A clause that opens with a hypothetical marker (`suppose`, `imagine`, `what if`, `let us assume`) is not a claim, by design. The marker scopes that clause only; stated text before it, or after a colon, semicolon, or dash, still has to clear the gate. See [CONSTITUTION.md](CONSTITUTION.md).
