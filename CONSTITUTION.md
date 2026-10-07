@@ -29,6 +29,14 @@ None of these proves the other two. A model-written explanation is not evidence 
 
 **Mind** is a project metaphor only. It does not claim consciousness or reliable introspection.
 
+## Hypothetical scope
+
+A clause that **opens** with a hypothetical marker (`imagine`, `suppose`, `hypothetically`, `what if`, `let us assume`, `let's assume`) is exempt from claim extraction by design.
+
+The marker is the speaker labeling that clause as not asserted. "Suppose the city is real." is speculation, not a factual claim for the JCR to block as unsupported. Exempting the opening-marked clause lets a draft discuss a supposition without turning the supposition itself into an uncertainty payload.
+
+The exemption is only that clause, and only rightward from the opening marker. It does not cover a stated assertion before the marker, after a colon, semicolon, or dash, or outside a parenthetical aside. Those stated parts are claims and fail closed. Bare `if` and `assuming` are not opening markers and do not grant the exemption.
+
 ## Out of scope for v0
 
 - Training a foundation model from scratch

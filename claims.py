@@ -192,6 +192,17 @@ def _inherit_subjects(clauses: list[str]) -> list[str]:
     return resolved
 
 
+_HARD_BOUNDARY = re.compile(r"[:;\u2014\u2013]|--")
+
+
+def _opens_with_hypothetical(text: str) -> bool:
+    bare = strip_citations(text).strip()
+    match = HYPOTHETICAL.search(bare)
+    if match is None:
+        return False
+    return not re.search(r"[A-Za-z0-9]", bare[: match.start()])
+
+
 def _split_when_both_clauses(text: str, splitter: re.Pattern[str]) -> list[str]:
     tokens = splitter.split(text.strip())
     if len(tokens) == 1:
@@ -201,7 +212,15 @@ def _split_when_both_clauses(text: str, splitter: re.Pattern[str]) -> list[str]:
     while index < len(tokens):
         separator = tokens[index]
         right = tokens[index + 1] if index + 1 < len(tokens) else ""
-        if looks_like_clause(clauses[-1]) and looks_like_clause(right):
+        split = looks_like_clause(clauses[-1]) and looks_like_clause(right)
+        if (
+            not split
+            and looks_like_clause(right)
+            and _HARD_BOUNDARY.search(separator)
+            and _opens_with_hypothetical(clauses[-1])
+        ):
+            split = True
+        if split:
             clauses.append(right)
         else:
             clauses[-1] = f"{clauses[-1]}{separator}{right}"
@@ -223,6 +242,88 @@ def clause_key(text: str) -> str:
     return strip_citations(text).rstrip(".!?").strip()
 
 
+TRAILING_CONNECTOR = re.compile(
+    r"[\s,;:—–()\-]+(?:and|but|or|nor|as well as)?\s*$",
+    re.I,
+)
+_RESTART_BOUNDARY = re.compile(r"\s*(?:[:;\u2014\u2013]|--)\s*")
+
+
+def _neutralize_parenthetical_markers(text: str) -> str:
+    """Drop hypothetical markers that sit inside parentheses.
+
+    A parenthetical marker is an aside. It must not scope text outside the
+    parentheses, and it must not hide an assertion that shares them.
+    """
+    out: list[str] = []
+    index = 0
+    length = len(text)
+    while index < length:
+        if text[index] != "(":
+            out.append(text[index])
+            index += 1
+            continue
+        depth = 1
+        cursor = index + 1
+        while cursor < length and depth:
+            if text[cursor] == "(":
+                depth += 1
+            elif text[cursor] == ")":
+                depth -= 1
+            cursor += 1
+        if depth:
+            out.append(text[index])
+            index += 1
+            continue
+        inner = text[index + 1 : cursor - 1]
+        if HYPOTHETICAL.search(inner):
+            cleaned = HYPOTHETICAL.sub(" ", inner)
+            cleaned = _neutralize_parenthetical_markers(cleaned)
+            cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,;:.—–-")
+            cleaned = re.sub(
+                r"^(?:and|but|or|nor|as well as)\s+",
+                "",
+                cleaned,
+                flags=re.I,
+            )
+            if cleaned and re.search(r"[A-Za-z0-9]", cleaned):
+                out.append(f" {cleaned} ")
+            else:
+                out.append(" ")
+        else:
+            out.append(text[index:cursor])
+        index = cursor
+    flattened = re.sub(r"\s+", " ", "".join(out)).strip()
+    return re.sub(r"\s+([.!?])", r"\1", flattened)
+
+
+def asserted_clause(text: str) -> str | None:
+    """Return stated text, or None when a clause-opening marker scopes it all.
+
+    A marker at the start of the clause is exempt: it marks the clause as not
+    asserted. Anywhere else it scopes rightward only, and a colon, semicolon,
+    or dash after an opening marker starts a new stated clause. Markers inside
+    parentheses do not scope text outside that aside.
+    """
+    bare = _neutralize_parenthetical_markers(strip_citations(text).strip())
+    if not bare:
+        return None
+    match = HYPOTHETICAL.search(bare)
+    if match is None:
+        return bare
+    prefix = bare[: match.start()]
+    if re.search(r"[A-Za-z0-9]", prefix):
+        stated = TRAILING_CONNECTOR.sub("", prefix).strip()
+        return stated or None
+    restart = _RESTART_BOUNDARY.search(bare[match.end() :])
+    if restart is None:
+        return None
+    rest = bare[match.end() + restart.end() :].strip()
+    if not rest:
+        return None
+    return asserted_clause(rest)
+
+
 def extract_claims(draft_text: str) -> list[Claim]:
     claims: list[Claim] = []
     index = 0
@@ -233,7 +334,11 @@ def extract_claims(draft_text: str) -> list[Claim]:
                 continue
             if bare.endswith("?"):
                 continue
-            if HYPOTHETICAL.search(bare):
+            scoped = asserted_clause(bare)
+            if scoped is None:
+                continue
+            bare = scoped
+            if bare.endswith("?"):
                 continue
             if UNCERTAINTY_ONLY.search(bare) and not ASSERTIVE.search(bare) and "=" not in bare:
                 continue

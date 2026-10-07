@@ -8,7 +8,14 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 
 from adapter import BaseLMAdapter, Draft
-from claims import Claim, clause_key, extract_claims, split_clauses, split_sentences
+from claims import (
+    Claim,
+    asserted_clause,
+    clause_key,
+    extract_claims,
+    split_clauses,
+    split_sentences,
+)
 from jcr import DecisionClass, decide
 from receipt import build_receipt
 from store import append_receipt
@@ -78,9 +85,20 @@ def drop_unsupported_sentences(
         for claim, item in zip(claims, support)
         if item.status == "unsupported"
     }
+    # A claim extracted as the asserted prefix of a hypothetical-marked clause
+    # drops the whole clause: the remainder was hypothetical-scoped anyway.
+    def _is_unsupported(clause: str) -> bool:
+        key = clause_key(clause)
+        stated = asserted_clause(clause)
+        stated_key = clause_key(stated) if stated else ""
+        return any(
+            key == bad or key.startswith(f"{bad} ") or stated_key == bad
+            for bad in unsupported
+        )
+
     rebuilt: list[str] = []
     for sentence in split_sentences(draft_text):
-        kept = [clause for clause in split_clauses(sentence) if clause_key(clause) not in unsupported]
+        kept = [clause for clause in split_clauses(sentence) if not _is_unsupported(clause)]
         if not kept:
             continue
         if len(kept) == 1:
